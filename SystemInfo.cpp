@@ -75,8 +75,17 @@ std::string GetWindowsFullInfo() {
 
                 pclsObj->Release();
             }
+            else {
+                oss << "Не удалось получить данные из Win32_OperatingSystem.\n";
+            }
             pEnumerator->Release();
         }
+        else {
+            oss << "Не удалось выполнить WMI-запрос для Win32_OperatingSystem. Ошибка: " << hres << "\n";
+        }
+    }
+    else {
+        oss << "WMI не инициализировано.\n";
     }
 
     return oss.str();
@@ -365,7 +374,7 @@ std::string GetMemoryInfo() {
     return oss.str();
 }
 
-// ========= 7) Устройства (PnP) =========
+// Пример оптимизированного WMI-запроса для GetDevicesInfo
 std::string GetDevicesInfo() {
     std::ostringstream oss;
     std::lock_guard<std::mutex> lock(g_wmiMutex);
@@ -373,7 +382,7 @@ std::string GetDevicesInfo() {
         IEnumWbemClassObject* pEnumerator = NULL;
         HRESULT hres = g_pSvc->ExecQuery(
             bstr_t("WQL"),
-            bstr_t(L"SELECT Name,Manufacturer,Description,DeviceID FROM Win32_PnPEntity"),
+            bstr_t(L"SELECT Name, Manufacturer, Description, DeviceID FROM Win32_PnPEntity WHERE PNPDeviceID IS NOT NULL"),
             WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
             NULL,
             &pEnumerator
@@ -389,11 +398,14 @@ std::string GetDevicesInfo() {
                 std::string desc = GetWMIPropertyFromObject(pclsObj, L"Description");
                 std::string devID = GetWMIPropertyFromObject(pclsObj, L"DeviceID");
 
-                oss << "=== Устройство ===\n";
-                oss << "Имя: " << name << "\n"
-                    << "Производитель: " << man << "\n"
-                    << "Описание: " << desc << "\n"
-                    << "DeviceID: " << devID << "\n\n";
+                // Фильтрация устройств по определённым критериям (например, исключение ненужных устройств)
+                if (desc.find("USB") != std::string::npos || desc.find("Bluetooth") != std::string::npos) {
+                    oss << "=== Устройство ===\n";
+                    oss << "Имя: " << name << "\n"
+                        << "Производитель: " << man << "\n"
+                        << "Описание: " << desc << "\n"
+                        << "DeviceID: " << devID << "\n\n";
+                }
 
                 pclsObj->Release();
             }

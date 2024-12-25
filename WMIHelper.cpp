@@ -82,6 +82,7 @@ HRESULT InitializeCOMAndSecurity() {
     return S_OK;
 }
 
+// Изменения в InitializeWMI
 HRESULT InitializeWMI() {
     std::lock_guard<std::mutex> lock(g_wmiMutex);
     if (g_pSvc != nullptr) {
@@ -93,15 +94,22 @@ HRESULT InitializeWMI() {
         CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER,
         IID_IWbemLocator, (LPVOID*)&pLoc
     );
-    if (FAILED(hres)) return hres;
+    if (FAILED(hres)) {
+        std::cerr << "Не удалось создать экземпляр IWbemLocator. Ошибка: " << hres << std::endl;
+        return hres;
+    }
 
     hres = pLoc->ConnectServer(
         _bstr_t(L"ROOT\\CIMV2"),
         NULL, NULL, 0, NULL, 0, 0,
         &g_pSvc
     );
+    if (FAILED(hres)) {
+        std::cerr << "Не удалось подключиться к WMI серверу. Ошибка: " << hres << std::endl;
+        pLoc->Release();
+        return hres;
+    }
     pLoc->Release();
-    if (FAILED(hres)) return hres;
 
     hres = CoSetProxyBlanket(
         g_pSvc,
@@ -111,6 +119,7 @@ HRESULT InitializeWMI() {
     );
 
     if (FAILED(hres)) {
+        std::cerr << "Не удалось установить прокси blanket. Ошибка: " << hres << std::endl;
         g_pSvc->Release();
         g_pSvc = nullptr;
     }
