@@ -94,6 +94,78 @@ std::string ParseWMIDate(const std::string& wmiDate) {
     return year + "." + month + "." + day;
 }
 
+// ========= 1) Версия Windows =========
+std::string GetWindowsVersion() {
+    HMODULE hMod = ::GetModuleHandleW(L"ntdll.dll");
+    if (!hMod)
+        return "Не удалось загрузить ntdll.dll";
+
+    RtlGetVersionPtr pRtlGetVersion = (RtlGetVersionPtr)::GetProcAddress(hMod, "RtlGetVersion");
+    if (!pRtlGetVersion)
+        return "Не удалось найти RtlGetVersion";
+
+    MY_RTL_OSVERSIONINFOW osver = { 0 };
+    osver.dwOSVersionInfoSize = sizeof(osver);
+
+    if (pRtlGetVersion(&osver) == STATUS_SUCCESS) {
+        std::wstring wcsd(osver.szCSDVersion);
+        std::string csd(wcsd.begin(), wcsd.end());
+
+        std::string osName;
+        if (osver.dwMajorVersion == 10) {
+            if (osver.dwBuildNumber >= 22000)
+                osName = "Windows 11";
+            else
+                osName = "Windows 10";
+        }
+        else {
+            osName = "Windows " + std::to_string(osver.dwMajorVersion) + "." +
+                std::to_string(osver.dwMinorVersion);
+        }
+
+        return osName + " (Build " + std::to_string(osver.dwBuildNumber) + ") " + csd;
+    }
+    return "Не удалось получить версию ОС";
+}
+
+// ========= 2) Расширенная информация о Windows =========
+std::string GetWindowsFullInfo() {
+    std::ostringstream oss;
+    oss << GetWindowsVersion() << "\n";
+
+    if (SUCCEEDED(InitializeWMI())) {
+        IEnumWbemClassObject* pEnumerator = NULL;
+        HRESULT hres = g_pSvc->ExecQuery(
+            bstr_t("WQL"),
+            bstr_t(L"SELECT OSArchitecture, SystemDrive, RegisteredUser, InstallDate FROM Win32_OperatingSystem"),
+            WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY,
+            NULL,
+            &pEnumerator
+        );
+
+        if (SUCCEEDED(hres)) {
+            IWbemClassObject* pclsObj = NULL;
+            ULONG uReturn = 0;
+            if (pEnumerator->Next(WBEM_INFINITE, 1, &pclsObj, &uReturn) == S_OK) {
+                std::string arch = GetWMIPropertyFromObject(pclsObj, L"OSArchitecture");
+                std::string drive = GetWMIPropertyFromObject(pclsObj, L"SystemDrive");
+                std::string user = GetWMIPropertyFromObject(pclsObj, L"RegisteredUser");
+                std::string installDateRaw = GetWMIPropertyFromObject(pclsObj, L"InstallDate");
+                std::string instDate = ParseWMIDate(installDateRaw);
+
+                oss << "Архитектура ОС: " << arch << "\n"
+                    << "Системный диск: " << drive << "\n"
+                    << "Зарегистрированный пользователь: " << user << "\n"
+                    << "Дата установки ОС: " << instDate << "\n";
+
+                pclsObj->Release();
+            }
+            pEnumerator->Release();
+        }
+    }
+
+    return oss.str();
+}
 
 // Глобальные переменные для WMI
 IWbemServices* g_pSvc = nullptr;
