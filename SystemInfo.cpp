@@ -216,10 +216,21 @@ std::string GetCPUInfo() {
                     << "L2 кэш: " << l2cache << " КБ\n"
                     << "L3 кэш: " << l3cache << " КБ\n";
 
+                Logger::getInstance().log("Получена информация о CPU: Ядер=" + cores + ", Логических процессоров=" + logical);
+
                 pclsObj->Release();
+            }
+            else {
+                Logger::getInstance().log("Не удалось получить данные из Win32_Processor.");
             }
             pEnumerator->Release();
         }
+        else {
+            Logger::getInstance().log("Не удалось выполнить WMI-запрос для Win32_Processor. Ошибка: " + std::to_string(hres));
+        }
+    }
+    else {
+        Logger::getInstance().log("WMI не инициализировано.");
     }
 
     return info.str();

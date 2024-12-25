@@ -3,6 +3,7 @@
 #include <mutex>
 #include "WMIHelper.h"
 #include "SystemInfo.h"
+#include "Logger.h"
 
 // Глобальные переменные для WMI
 IWbemServices* g_pSvc = nullptr;

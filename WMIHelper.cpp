@@ -82,10 +82,10 @@ HRESULT InitializeCOMAndSecurity() {
     return S_OK;
 }
 
-// Изменения в InitializeWMI
 HRESULT InitializeWMI() {
     std::lock_guard<std::mutex> lock(g_wmiMutex);
     if (g_pSvc != nullptr) {
+        Logger::getInstance().log("WMI уже инициализировано.");
         return S_OK; // Уже инициализировано
     }
 
@@ -95,7 +95,7 @@ HRESULT InitializeWMI() {
         IID_IWbemLocator, (LPVOID*)&pLoc
     );
     if (FAILED(hres)) {
-        std::cerr << "Не удалось создать экземпляр IWbemLocator. Ошибка: " << hres << std::endl;
+        Logger::getInstance().log("Не удалось создать экземпляр IWbemLocator. Ошибка: " + std::to_string(hres));
         return hres;
     }
 
@@ -105,7 +105,7 @@ HRESULT InitializeWMI() {
         &g_pSvc
     );
     if (FAILED(hres)) {
-        std::cerr << "Не удалось подключиться к WMI серверу. Ошибка: " << hres << std::endl;
+        Logger::getInstance().log("Не удалось подключиться к WMI серверу. Ошибка: " + std::to_string(hres));
         pLoc->Release();
         return hres;
     }
@@ -119,9 +119,12 @@ HRESULT InitializeWMI() {
     );
 
     if (FAILED(hres)) {
-        std::cerr << "Не удалось установить прокси blanket. Ошибка: " << hres << std::endl;
+        Logger::getInstance().log("Не удалось установить прокси blanket. Ошибка: " + std::to_string(hres));
         g_pSvc->Release();
         g_pSvc = nullptr;
+    }
+    else {
+        Logger::getInstance().log("WMI успешно инициализировано.");
     }
 
     return hres;
